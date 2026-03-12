@@ -1,16 +1,23 @@
 # OpenClaw Agents Watch
 
-一个给 **OpenClaw / 本地多 agent 使用者** 的观察工具原型。
+一个给 **OpenClaw / 本地多 agents 使用者** 的观察工具原型。
 
 它的目标很直接：
 
-> 当多个 agents 在本地运行时，你不需要再盯着静默终端等结果。
+> 当多个 agents 在本地运行时，你不需要再盯着静默终端等结果。  
 > 你可以直接看到谁在执行、谁在等待确认、谁疑似卡住、谁已经完成。
 
 当前项目提供两种查看方式：
 
 1. **CLI 模式**：适合终端快速查看、持续 watch、低打扰盯盘
-2. **GUI 模式**：适合桌面观察、筛选日志、查看 agent 当前状态
+2. **GUI 模式**：适合桌面观察、筛选日志、查看 agents 当前状态
+
+## Screenshots
+
+<p>
+  <img src="docs/images/gui-overview.png" width="48%" alt="GUI overview" />
+  <img src="docs/images/cli-watch.png" width="48%" alt="CLI watch" />
+</p>
 
 ## 适合谁
 
@@ -32,7 +39,7 @@
 
 CLI 直接读取本机 OpenClaw 配置与会话数据，提供：
 
-- `overview`：agent 概览（谁在跑、谁完成、谁失败、谁疑似卡住）
+- `overview`：agents 概览（谁在跑、谁完成、谁失败、谁疑似卡住）
 - `stream`：最近时间线（按真实会话消息回放）
 - `summary`：工作纪要（更像晨报，不是机械计数）
 - `watch`：持续刷新观察台
@@ -42,7 +49,7 @@ CLI 直接读取本机 OpenClaw 配置与会话数据，提供：
 GUI 当前是单列桌面观察台：
 
 - 顶部总览（执行中 / 等待确认 / 完成 / 风险）
-- agent 列表
+- agents 列表
 - 日志详情（简洁 / 详细）
 - 范围 / 搜索 / 刷新工具栏
 - 类型筛选
@@ -61,7 +68,7 @@ node bin/agent-timeline.mjs stream --minutes 180 --limit 40
 # 工作纪要
 node bin/agent-timeline.mjs summary --minutes 1440
 
-# 持续刷新（更适合盯多 agent）
+# 持续刷新（更适合盯多 agents）
 node bin/agent-timeline.mjs watch --minutes 180 --limit 20 --interval-sec 5
 ```
 
@@ -119,3 +126,10 @@ npm run gui:start
 这个项目就是为了解决这个问题：
 
 > 给本地多 agent 环境一个能看、能扫读、能快速判断状态的观察界面。
+
+## 更多示例
+
+- `docs/examples/overview.txt`
+- `docs/examples/stream.txt`
+- `docs/examples/summary.txt`
+- `docs/examples/watch.txt`
