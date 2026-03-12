@@ -16,7 +16,7 @@
 
 <p>
   <img src="docs/images/gui.png" width="48%" alt="GUI overview" />
-  <img src="docs/images/cli-watch.png" width="48%" alt="CLI watch" />
+  <img src="docs/images/cli.png" width="48%" alt="CLI watch" />
 </p>
 
 ## 适合谁
