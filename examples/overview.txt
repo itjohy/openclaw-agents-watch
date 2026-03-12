@@ -1,7 +1,0 @@
-Agents:
-main          idle          最近更新 -      -
-🛠️ Dev       failed        最近更新 0s     dev-agent-timeline-pass2
-📊 Finance    idle          最近更新 -      -
-📈 Market     idle          最近更新 -      -
-🧭 Ops        idle          最近更新 -      -
-🧪 Trade      idle          最近更新 -      -

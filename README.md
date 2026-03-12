@@ -15,7 +15,7 @@
 ## Screenshots
 
 <p>
-  <img src="docs/images/gui-overview.png" width="48%" alt="GUI overview" />
+  <img src="docs/images/gui.png" width="48%" alt="GUI overview" />
   <img src="docs/images/cli-watch.png" width="48%" alt="CLI watch" />
 </p>
 
