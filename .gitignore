@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+npm-debug.log*
+.vscode/
+coverage/
+.backup/
+
+# local-only notes
+NEXT_SESSION_PROMPT.md

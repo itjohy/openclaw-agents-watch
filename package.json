@@ -1,0 +1,27 @@
+{
+  "name": "openclaw-agents-watch",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/gui/electron/main.mjs",
+  "scripts": {
+    "cli:overview": "node bin/agent-timeline.mjs overview",
+    "cli:stream": "node bin/agent-timeline.mjs stream --minutes 180 --limit 40",
+    "cli:watch": "node bin/agent-timeline.mjs watch --minutes 180 --limit 20 --interval-sec 5",
+    "gui:dev": "concurrently -k \"vite --config src/gui/renderer/vite.config.mjs\" \"wait-on tcp:5173 && electron .\"",
+    "gui:build": "vite build --config src/gui/renderer/vite.config.mjs",
+    "gui:start": "cross-env NODE_ENV=production electron ."
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.4.1",
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^35.0.1",
+    "vite": "^6.2.1",
+    "wait-on": "^8.0.3"
+  }
+}

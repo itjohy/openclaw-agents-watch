@@ -1,0 +1,9 @@
+node_modules/
+.DS_Store
+*.log
+NEXT_SESSION_PROMPT.md
+STATUS.md
+GUI_PRD.md
+PRD.md
+examples/
+src/gui/renderer/src/
