@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DashboardPage } from './pages/DashboardPage.jsx';
-import { toSelectionFromEvent, toSelectionFromTask } from './lib/presentation.js';
+import { formatCompactNumber, toSelectionFromEvent, toSelectionFromTask } from './lib/presentation.js';
+
+function formatRefreshTime(value) {
+  if (!value) return '--:--:--';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '--:--:--';
+  return [date.getHours(), date.getMinutes(), date.getSeconds()]
+    .map((part) => String(part).padStart(2, '0'))
+    .join(':');
+}
 
 function OverviewOrb({ label, value, tone = 'neutral', note, title }) {
   return (
@@ -100,7 +109,14 @@ export default function App() {
 
   const filteredSnapshot = useMemo(() => applyFilters(snapshot, filters), [snapshot, filters]);
   const selectedAgent = filteredSnapshot?.agents.find((agent) => agent.id === selectedAgentId) || filteredSnapshot?.agents[0] || null;
-  const executingCount = filteredSnapshot?.agents?.filter((agent) => ['running', 'waiting_user', 'blocked'].includes(agent.status)).length ?? 0;
+  const executingCount = filteredSnapshot?.agents?.filter((agent) => agent.status === 'running').length ?? 0;
+  const tokenSource = selectedAgent?.tokenStats?.countedMessages ? selectedAgent : null;
+  const tokenStats = tokenSource?.tokenStats || filteredSnapshot?.overview?.tokenStats || null;
+  const tokenLabel = tokenSource ? `${tokenSource.name} 平均` : '全局平均';
+  const tokenValue = tokenStats?.avgPerMessage ? formatCompactNumber(tokenStats.avgPerMessage) : '—';
+  const lastUpdatedTime = formatRefreshTime(snapshot?.overview.updatedAt);
+  const isRefreshActive = loading || refreshing;
+  const refreshStateLabel = snapshot ? '已开启' : (loading ? '读取中' : '已开启');
 
   useEffect(() => {
     if (!filteredSnapshot) {
@@ -142,17 +158,33 @@ export default function App() {
                   <h1>观望台</h1>
                 </div>
                 <span className="toolbar-meta stacked-meta title-meta-below">
-                  <span>{loading ? '读取中…' : filteredSnapshot ? `最近 ${filteredSnapshot.overview.windowMinutes} 分钟` : '等待数据'}</span>
-                  <span className="toolbar-meta-subline fixed-width-meta">{refreshing ? `静默刷新中 · ${refreshSeconds}s` : snapshot?.overview.updatedAt ? `更新 ${new Date(snapshot.overview.updatedAt).toLocaleTimeString('zh-CN')} · ${refreshSeconds}s` : '等待首轮刷新'}</span>
+                  <span>{filteredSnapshot ? `最近 ${filteredSnapshot.overview.windowMinutes} 分钟` : '等待数据'}</span>
+                  <span className="toolbar-meta-subline refresh-meta-line" aria-live="polite">
+                    <span className={`refresh-meta-slot refresh-state-slot ${isRefreshActive ? 'is-refreshing' : ''}`}>
+                      <span className="refresh-meta-key">状态</span>
+                      <span className="refresh-meta-value refresh-state">
+                        <span>{refreshStateLabel}</span>
+                        <span className={`refresh-inline-indicator ${isRefreshActive ? 'is-active' : ''}`} aria-hidden="true" />
+                      </span>
+                    </span>
+                    <span className="refresh-meta-slot refresh-interval-slot">
+                      <span className="refresh-meta-key">周期</span>
+                      <span className="refresh-meta-value">{refreshSeconds}s</span>
+                    </span>
+                    <span className="refresh-meta-slot refresh-updated-slot">
+                      <span className="refresh-meta-key">更新</span>
+                      <span className="refresh-meta-value refresh-time">{lastUpdatedTime}</span>
+                    </span>
+                  </span>
                 </span>
               </div>
             </div>
 
             <div className="top-summary-metrics top-summary-metrics-4">
-              <OverviewOrb label="执行中" value={executingCount ?? '—'} tone="peach" title="按 agent 最新状态去重：running / waiting_user / blocked" />
+              <OverviewOrb label="执行中" value={executingCount ?? '—'} tone="peach" title="按 agent 最新状态去重：仅统计 running" />
               <OverviewOrb label="等待确认" value={filteredSnapshot?.overview?.waitingCount ?? '—'} tone="yellow" />
               <OverviewOrb label="完成" value={filteredSnapshot?.overview?.completedCount ?? '—'} tone="mint" />
-              <OverviewOrb label="风险" value={filteredSnapshot?.overview?.riskCount ?? '—'} tone="rose" />
+              <OverviewOrb label={tokenLabel} value={tokenValue} tone="neutral" note="tokens / 消息" title={tokenSource ? '优先显示当前选中 agent 的平均 tokens / 消息' : '当前没有选中 agent token 数据，回退显示全局平均'} />
             </div>
           </div>
         </div>

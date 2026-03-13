@@ -48,12 +48,6 @@ export function DashboardPage({ snapshot, loading, refreshing, refreshSeconds, s
   return (
     <section className="dashboard-column">
       <div className="panel panel-terminal agent-panel">
-        <div className="panel-head-row compact-head-row">
-          <div>
-            <h2>agent 列表</h2>
-          </div>
-          <div className="panel-hint">按状态分组，没在跑就不显示“正在执行”</div>
-        </div>
         <div className="list-head agent-head">
           <span>Agent</span>
           <span>状态</span>
@@ -124,7 +118,12 @@ export function DashboardPage({ snapshot, loading, refreshing, refreshSeconds, s
                   {[3, 5, 10, 15].map((seconds) => <option key={seconds} value={seconds}>{seconds} 秒</option>)}
                 </select>
               </label>
-              <button className="refresh-btn terminal-refresh-btn no-drag" onClick={onRefresh}>{loading || refreshing ? '刷新中…' : '立即刷新'}</button>
+              <button className={`refresh-btn terminal-refresh-btn no-drag ${loading || refreshing ? 'is-busy' : ''}`} onClick={onRefresh}>
+                <span className="refresh-btn-label">立即刷新</span>
+                <span className="refresh-btn-indicator-slot" aria-hidden="true">
+                  <span className={`refresh-inline-indicator refresh-btn-indicator ${loading || refreshing ? 'is-active' : ''}`} />
+                </span>
+              </button>
             </div>
           </div>
 

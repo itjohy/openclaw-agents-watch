@@ -261,6 +261,82 @@ export function normalizeMainUserText(text = '') {
   return oneLine.replace(/^\[[^\]]+\]\s*/, '').trim();
 }
 
+function extractNumberedOptions(text = '') {
+  const source = singleLine(String(text || '').replace(/^\[\[[^\]]+\]\]\s*/, '').trim());
+  const matches = [...source.matchAll(/(?:^|\s)(\d+)[.)、]\s+([\s\S]+?)(?=(?:\s+\d+[.)、]\s+)|$)/g)];
+  if (!matches.length) return [];
+  return matches.map((m) => ({
+    index: Number(m[1]),
+    label: singleLine(m[2])
+      .replace(/^[-*]\s+/, '')
+      .replace(/[*_`#>]/g, '')
+      .replace(/^(把|回到|继续|给)\s+/, '$1 ')
+      .replace(/( 现在| 当前| 这是| 不再只是|，现在|。现在|；现在).*/, '')
+      .replace(/[：:].*$/, '')
+      .trim(),
+  }));
+}
+
+function resolveMainUserIntent(rawText = '', previousAssistantText = '', currentState = null) {
+  const clean = normalizeMainUserText(rawText);
+  if (!clean) return null;
+
+  const options = extractNumberedOptions(previousAssistantText);
+  const first = options[0];
+  const second = options[1];
+  const third = options[2];
+  const approvalLike = /^(可以|好|好的|行|行啊|ok|okay|yes|y|准了|同意|继续|开始吧|升吧|升级吧|就这样|就按这个)$/i.test(clean);
+
+  if (approvalLike && currentState?.status === 'waiting_user') {
+    return {
+      kind: 'confirm_existing',
+      title: currentState?.title || clean,
+      detail: clean,
+    };
+  }
+
+  if (/^\d+$/.test(clean)) {
+    const picked = options.find((item) => item.index === Number(clean));
+    if (picked?.label) {
+      return {
+        kind: currentState?.status === 'waiting_user' ? 'confirm_existing' : 'new_task',
+        title: `${clean} · ${picked.label}`,
+        detail: clean,
+      };
+    }
+  }
+
+  if (options.length) {
+    if (/^(第?一(个|项)?|首个|第1(个|项)?|1|就这个|这个|按你说的|按你建议的|按你的建议|用你推荐的|就按这个|继续刚才那个|继续这个|继续这个方向)$/i.test(clean)) {
+      return {
+        kind: currentState?.status === 'waiting_user' ? 'confirm_existing' : 'new_task',
+        title: first?.label ? `1 · ${first.label}` : clean,
+        detail: clean,
+      };
+    }
+    if (/^(第?二(个|项)?|第2(个|项)?|2)$/i.test(clean)) {
+      return {
+        kind: currentState?.status === 'waiting_user' ? 'confirm_existing' : 'new_task',
+        title: second?.label ? `2 · ${second.label}` : clean,
+        detail: clean,
+      };
+    }
+    if (/^(第?三(个|项)?|第3(个|项)?|3)$/i.test(clean)) {
+      return {
+        kind: currentState?.status === 'waiting_user' ? 'confirm_existing' : 'new_task',
+        title: third?.label ? `3 · ${third.label}` : clean,
+        detail: clean,
+      };
+    }
+  }
+
+  return {
+    kind: 'new_task',
+    title: clean,
+    detail: clean,
+  };
+}
+
 export function mainEventTitle(kind, text = '', agentId = null) {
   const target = agentId ? ` → ${agentId}` : '';
   const clean = shortTitle(text, 40);
@@ -306,6 +382,7 @@ export function parseMainSessionEvents({ sessionMap, minutes }) {
   const lines = readJsonl(sessionFile);
   let state = null;
   let pendingInternalAgent = null;
+  let previousAssistantText = '';
 
   for (const line of lines) {
     if (line.type !== 'message' || !line.message) continue;
@@ -331,19 +408,41 @@ export function parseMainSessionEvents({ sessionMap, minutes }) {
         continue;
       }
 
-      const userText = normalizeMainUserText(text);
-      if (!userText) continue;
+      const resolved = resolveMainUserIntent(text, previousAssistantText, state);
+      if (!resolved?.title) continue;
+
+      if (resolved.kind === 'confirm_existing' && state) {
+        events.push({
+          id: `${line.id}:confirmed`,
+          ts,
+          agentId: 'main',
+          taskId: state.taskId,
+          kind: 'main_received',
+          title: `用户确认继续：${shortTitle(resolved.title, 40)}`,
+          detail: shortDetail(resolved.detail || resolved.title, 120),
+          level: 'info',
+        });
+        state.updatedAt = ts;
+        state.lastEventKind = 'main_received';
+        state.lastEventTitle = `用户确认继续：${shortTitle(resolved.title, 40)}`;
+        state.status = 'running';
+        if (resolved.title && displayWidth(resolved.title) > displayWidth(state.title || '')) {
+          state.title = shortTitle(resolved.title, 48);
+        }
+        continue;
+      }
+
       state = {
         taskId: `main:${line.id}`,
         agentId: 'main',
-        title: shortTitle(userText, 48),
+        title: shortTitle(resolved.title, 48),
         status: 'running',
         startedAt: ts,
         updatedAt: ts,
         warning: false,
         silenceSec: 0,
         lastEventKind: 'main_received',
-        lastEventTitle: mainEventTitle('main_received', userText),
+        lastEventTitle: mainEventTitle('main_received', resolved.title),
       };
       tasks.push(state);
       events.push({
@@ -352,8 +451,8 @@ export function parseMainSessionEvents({ sessionMap, minutes }) {
         agentId: 'main',
         taskId: state.taskId,
         kind: 'main_received',
-        title: mainEventTitle('main_received', userText),
-        detail: shortDetail(userText, 120),
+        title: mainEventTitle('main_received', resolved.title),
+        detail: shortDetail(resolved.detail || resolved.title, 120),
         level: 'info',
       });
       continue;
@@ -390,6 +489,7 @@ export function parseMainSessionEvents({ sessionMap, minutes }) {
     }
 
     const info = classifyMainAssistantText(candidateText, { afterInternal: Boolean(pendingInternalAgent), hasReply: Boolean(finalReplyText), hasExplicitRoute: explicitRoute });
+    previousAssistantText = candidateText || previousAssistantText;
     pendingInternalAgent = null;
     if (!info) continue;
     const [kind, title, level] = info;
@@ -761,7 +861,8 @@ export function renderSummary(agents, tasks, events) {
     const failed = relatedTasks.filter((t) => t.status === 'failed').length;
     const blocked = relatedTasks.filter((t) => t.status === 'blocked').length;
     const running = relatedTasks.filter((t) => t.status === 'running').length;
-    const waiting = relatedTasks.filter((t) => t.status === 'waiting_user').length;
+    const waitingTasks = relatedTasks.filter((t) => t.status === 'waiting_user');
+    const waiting = waitingTasks.filter((t) => !isLowValueMainPendingTask(t)).length;
     const latestTask = [...relatedTasks].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0];
     const latestEvent = relatedEvents.slice(-1)[0];
     const milestoneCount = relatedEvents.filter((e) => e.kind === 'milestone').length;
@@ -797,7 +898,7 @@ function cleanPendingPhrase(value = '') {
   return singleLine(value)
     .replace(/^(继续收口|结论|说明|更新|回复|反馈|同步)[:：]?/g, '')
     .replace(/^(已分派给|主控收到|主控审阅|主控等你|主控已回传)[:：\s-]*/g, '')
-    .replace(/^(开始处理|任务完成|任务失败|提醒|疑似卡住)[:：]/g, '')
+    .replace(/^(开始处理|任务完成|任务失败|提醒|疑似卡住|用户确认继续)[:：]/g, '')
     .replace(/（.*?）|\(.*?\)/g, ' ')
     .replace(/[【\[][^】\]]+[】\]]/g, ' ')
     .replace(/[#*`>]+/g, ' ')
@@ -807,6 +908,22 @@ function cleanPendingPhrase(value = '') {
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
+}
+
+function isTrivialApprovalText(value = '') {
+  return /^(可以|好|好的|行|行啊|ok|okay|yes|y|准了|同意|继续|开始吧|升吧|升级吧|就这样|就按这个)$/i.test(singleLine(value));
+}
+
+function isLowValueMainPendingTask(task) {
+  if (task?.agentId !== 'main' || task?.status !== 'waiting_user') return false;
+  const title = singleLine(task.title || '');
+  const lastEvent = singleLine(task.lastEventTitle || '');
+  const shortAffirmation = isTrivialApprovalText(title);
+  const upgradeAckLike = /以后每次升级都想这样稳健一点|升级后就不能用了|先把openclaw升级了|做一个备份/i.test(title);
+  if (shortAffirmation) return true;
+  if (upgradeAckLike) return true;
+  if (lastEvent.startsWith('用户确认继续：')) return true;
+  return false;
 }
 
 function normalizePendingKey(task) {
@@ -937,13 +1054,14 @@ export function buildGuiSnapshot(raw, opts = {}) {
 
   const activeAgentIds = new Set(
     agents
-      .filter((agent) => ['running', 'blocked'].includes(agent.status))
+      .filter((agent) => agent.status === 'running')
       .map((agent) => agent.id),
   );
 
   const pendingMap = new Map();
   raw.tasks
     .filter((task) => ['waiting_user', 'blocked', 'failed'].includes(task.status))
+    .filter((task) => !isLowValueMainPendingTask(task))
     .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
     .forEach((task) => {
       const key = normalizePendingKey(task);
@@ -956,9 +1074,8 @@ export function buildGuiSnapshot(raw, opts = {}) {
   const overview = {
     activeCount: raw.tasks.filter((task) => task.status === 'running').length,
     executingCount: agents.filter((agent) => ['running', 'waiting_user', 'blocked'].includes(agent.status)).length,
-    waitingCount: agents.filter((agent) => agent.status === 'waiting_user').length,
+    waitingCount: pending.filter((task) => task.status === 'waiting_user').length,
     completedCount: raw.tasks.filter((task) => task.status === 'completed').length,
-    riskCount: agents.filter((agent) => ['failed', 'blocked'].includes(agent.status)).length,
     windowMinutes: minutes,
     updatedAt: new Date().toISOString(),
     tokenStats,

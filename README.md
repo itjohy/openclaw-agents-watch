@@ -20,6 +20,19 @@ This project currently provides two ways to observe your runtime:
 2. **GUI 模式**：适合桌面观察、筛选日志、查看 agents 当前状态  
    **GUI mode**: great for desktop observation, log filtering, and checking current agent status
 
+## Latest iteration
+
+Current checked-in iteration: **v0.1.1**
+
+Highlights in this update:
+- tightened `正在执行` so it reflects actual `running` agents
+- reduced redundant list chrome in the GUI
+- made the top refresh area layout-stable during automatic refresh
+- kept `已开启` and `立即刷新` visually stable, using fixed-size activity indicators instead of flashing text swaps
+- improved narrow-width behavior by relaxing several hard-coded widths
+
+See `CHANGELOG.md` for the concise update note.
+
 ## Screenshots
 
 <p>
